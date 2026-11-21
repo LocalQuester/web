@@ -21,3 +21,5 @@ body { display: flex; justify-content: center; min-height: 100dvh; }
 .home-screen h1 { font-size: 24px; }
 .home-screen p { color: #526158; }
 .home-screen button { background: #317e56; border: 0; color: white; border-radius: 8px; padding: 12px 18px; }
+
+@media (max-height: 600px) { .login-screen { overflow: visible; padding: 80px 0 32px; } .login-brand, .login-actions { position: relative; top: auto; left: auto; transform: none; margin-inline: auto; } .login-actions { margin-top: 80px; } }

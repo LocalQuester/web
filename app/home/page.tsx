@@ -1,11 +1,13 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getApiUrl } from '../../lib/api-url';
 
 export default async function Home() {
   const token = (await cookies()).get('lq_session')?.value;
-  const apiUrl = process.env.API_URL;
+  const apiUrl = getApiUrl();
   if (!token || !apiUrl) redirect('/login');
   const result = await fetch(new URL('/auth/me', apiUrl), {
+    signal: AbortSignal.timeout(5000),
     headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
   }).catch(() => null);
   if (!result?.ok) redirect('/login');
