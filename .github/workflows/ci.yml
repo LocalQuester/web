@@ -14,6 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate issue-linked branch
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_HEAD_REF" =~ ^(feat|fix|chore|docs|refactor|test|ci)/([0-9]+)-[a-z0-9-]+$ ]]; then
+            echo "Branch must be type/issue-number-description" >&2
+            exit 1
+          fi
+          issue="${BASH_REMATCH[2]}"
+          body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+          if ! grep -Eiq "(closes|fixes|resolves) #${issue}([^0-9]|$)" <<< "$body"; then
+            echo "PR body must contain Closes #${issue}" >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
