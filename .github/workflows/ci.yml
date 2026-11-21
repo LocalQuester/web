@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
     types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate issue-linked branch
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.base_ref != 'main'
         shell: bash
         run: |
           if [[ ! "$GITHUB_HEAD_REF" =~ ^(feat|fix|chore|docs|refactor|test|ci)/([0-9]+)-[a-z0-9-]+$ ]]; then
