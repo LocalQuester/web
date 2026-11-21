@@ -1,0 +1,32 @@
+name: Branch policy
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+  issues: read
+jobs:
+  branch-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            if (pr.head.repo.full_name !== context.repo.owner + '/' + context.repo.repo) {
+              throw new Error('Use a work branch in this repository.');
+            }
+            if (pr.base.ref === 'main') {
+              if (pr.head.ref !== 'develop') throw new Error('main accepts release PRs from develop only.');
+              if (!pr.title.startsWith('release: ')) throw new Error('Release PR title must start with release: ');
+              const match = body.match(/(?:closes|fixes|resolves)\s+#(\d+)\b/i);
+              if (!match) throw new Error('Link a separate deployment issue using Closes #number.');
+              const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: Number(match[1])});
+              if (issue.pull_request || !issue.title.includes('배포')) throw new Error('Link a deployment issue with 배포 in its title.');
+            } else {
+              const match = pr.head.ref.match(/^(feat|fix|chore|docs|refactor|test|ci)\/(\d+)-[a-z0-9-]+$/);
+              if (!match) throw new Error('Use type/issue-number-description for work branches.');
+              if (!new RegExp('(?:closes|fixes|resolves)\\s+#' + match[2] + '\\b', 'i').test(body)) throw new Error('Link the branch issue using Closes #number.');
+            }
