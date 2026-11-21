@@ -21,10 +21,13 @@ jobs:
             if (pr.base.ref === 'main') {
               if (pr.head.ref !== 'develop') throw new Error('main accepts release PRs from develop only.');
               if (!pr.title.startsWith('release: ')) throw new Error('Release PR title must start with release: ');
-              const match = body.match(/(?:closes|fixes|resolves)\s+#(\d+)\b/i);
-              if (!match) throw new Error('Link a separate deployment issue using Closes #number.');
-              const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: Number(match[1])});
-              if (issue.pull_request || !issue.title.includes('배포')) throw new Error('Link a deployment issue with 배포 in its title.');
+              const matches = [...body.matchAll(/(?:closes|fixes|resolves)\s+#(\d+)\b/gi)];
+              let deploymentIssue = false;
+              for (const match of matches) {
+                const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: Number(match[1])});
+                if (!issue.pull_request && issue.title.includes('배포')) deploymentIssue = true;
+              }
+              if (!deploymentIssue) throw new Error('Link a separate deployment issue with 배포 in its title.');
             } else {
               const match = pr.head.ref.match(/^(feat|fix|chore|docs|refactor|test|ci)\/(\d+)-[a-z0-9-]+$/);
               if (!match) throw new Error('Use type/issue-number-description for work branches.');
