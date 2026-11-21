@@ -29,3 +29,13 @@
 ## PR 본문
 
 필수 항목은 '## 📌 작업 내용', '## ⚠️ 참고 사항', '## 🔗 관련 이슈'입니다. 관련 이슈 항목에 브랜치와 같은 번호의 Closes #번호를 작성합니다. '## 📷 스크린 샷'은 선택 항목이며 이미지가 없으면 섹션 전체를 삭제할 수 있습니다.
+
+## 허용되는 작업 브랜치 이름
+
+형식: 타입/이슈번호-작업설명
+
+- 타입: feat, fix, chore, docs, refactor, test, ci 중 하나
+- 이슈 번호: 숫자
+- 작업 설명: 영문 소문자, 숫자, 하이픈만 사용
+- 예: feat/3-auth-screens, fix/12-login-callback, ci/5-develop-release-flow
+- 일반 작업 PR의 대상은 develop입니다. main 대상 릴리즈 PR의 출발 브랜치는 develop만 허용합니다.
