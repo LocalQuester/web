@@ -28,7 +28,10 @@ jobs:
               let deploymentIssue = false;
               for (const match of matches) {
                 const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: Number(match[1])});
-                if (!issue.pull_request && issue.title.includes('배포')) deploymentIssue = true;
+                if (!issue.pull_request && issue.title.includes('배포')) {
+                  deploymentIssue = true;
+                  break;
+                }
               }
               if (!deploymentIssue) throw new Error('Link a separate deployment issue with 배포 in its title.');
             } else {
