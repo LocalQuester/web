@@ -1,0 +1,5 @@
+language: ko-KR
+reviews:
+  high_level_summary: false
+  poem: false
+  in_progress_fortune: false
