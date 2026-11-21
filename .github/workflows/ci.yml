@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate web app
+        run: |
+          if [ ! -f package.json ]; then
+            echo "Web app code has not been added yet"
+            exit 0
+          fi
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
