@@ -1,5 +1,5 @@
 language: ko-KR
 reviews:
-  high_level_summary: false
+  high_level_summary: true
   poem: false
   in_progress_fortune: false
