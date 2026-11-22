@@ -1,0 +1,8 @@
+language: ko-KR
+reviews:
+  auto_review:
+    base_branches:
+      - '^main$'
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
