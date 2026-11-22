@@ -1,7 +1,7 @@
 .screen { display: flex; flex-direction: column; overflow: visible; padding-top: max(54px, env(safe-area-inset-top)); }
 .header { height: 60px; padding: 0 16px; display: flex; align-items: center; flex-shrink: 0; }
 .iconButton { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; padding: 0; border: 0; background: none; cursor: pointer; flex-shrink: 0; }
-.iconButton:focus-visible, .termLabel:focus-within, .allConsent:focus-within { outline: 2px solid #2f7d50; outline-offset: 4px; border-radius: 4px; }
+.iconButton:focus-visible, .termLabel:has(input:focus-visible), .allConsent:has(input:focus-visible) { outline: 2px solid #2f7d50; outline-offset: 4px; border-radius: 4px; }
 .content { padding: 17px 16px 32px; }
 .title { color: #0e1511; font-size: 24px; font-weight: 600; line-height: 1.5; margin: 0; }
 .allConsent { position: relative; display: flex; gap: 18px; align-items: center; min-height: 60px; padding: 16px; margin-top: 36px; border-radius: 12px; background: #eaf5ee; font-size: 18px; line-height: 1.5; cursor: pointer; }
