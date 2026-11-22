@@ -1,0 +1,19 @@
+.screen { display: flex; flex-direction: column; overflow: visible; padding-top: max(54px, env(safe-area-inset-top)); }
+.header { height: 60px; padding: 0 16px; display: flex; align-items: center; flex-shrink: 0; }
+.iconButton { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; padding: 0; border: 0; background: none; cursor: pointer; flex-shrink: 0; }
+.iconButton:focus-visible, .termLabel:has(input:focus-visible), .allConsent:has(input:focus-visible) { outline: 2px solid #2f7d50; outline-offset: 4px; border-radius: 4px; }
+.content { padding: 17px 16px 32px; }
+.title { color: #0e1511; font-size: 24px; font-weight: 600; line-height: 1.5; margin: 0; }
+.allConsent { position: relative; display: flex; gap: 18px; align-items: center; min-height: 60px; padding: 16px; margin-top: 36px; border-radius: 12px; background: #eaf5ee; font-size: 18px; line-height: 1.5; cursor: pointer; }
+.checkbox { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.caption { margin: 28px 0 18px; color: #3b4840; font-size: 13px; line-height: normal; }
+.list { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 28px; }
+.termLabel { position: relative; display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; color: #27312b; font-size: 17px; line-height: 1.4; cursor: pointer; }
+.termLabel img, .allConsent img { flex-shrink: 0; }
+.forward { transform: scaleX(-1); }
+.cta { margin-top: auto; padding: 24px 17px max(52px, env(safe-area-inset-bottom)); background: white; }
+.detail { color: #27312b; font-size: 16px; line-height: 1.7; }
+.detail h2 { font-size: 18px; margin: 28px 0 12px; }
+.detail p { margin: 12px 0; }
+.detail .draftNotice { color: #526158; font-size: 14px; margin-top: 24px; }
