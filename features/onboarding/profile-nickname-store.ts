@@ -1,15 +1,23 @@
 const STORAGE_KEY = 'localquester:onboarding:nickname';
 const CHANGE_EVENT = 'localquester:nickname-change';
 let fallback = '';
+let preferMemory = false;
 
 export function readNicknameDraft(): string {
+  if (preferMemory) return fallback;
   try { return window.sessionStorage.getItem(STORAGE_KEY) ?? fallback; }
   catch { return fallback; }
 }
 
 export function writeNicknameDraft(value: string) {
   fallback = value;
-  try { window.sessionStorage.setItem(STORAGE_KEY, value); } catch { /* 저장소 사용이 막혀도 현재 탭에서 유지합니다. */ }
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, value);
+    preferMemory = false;
+  } catch {
+    // 저장소에 이전 값이 남아 있어도 가장 최근 입력을 우선합니다.
+    preferMemory = true;
+  }
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 

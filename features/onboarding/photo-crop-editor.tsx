@@ -8,6 +8,9 @@ import styles from './profile-photo.module.css';
 
 export type PhotoCandidate = PhotoSize & { src: string };
 type CropView = { zoom: number; pan: PhotoPan };
+const arrowOffsets: Partial<Record<string, readonly [number, number]>> = {
+  ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10],
+};
 const initialView: CropView = { zoom: 1, pan: { x: 0, y: 0 } };
 
 export function PhotoCropEditor({ candidate, busy, onCancel, onSave }: {
@@ -89,7 +92,7 @@ export function PhotoCropEditor({ candidate, busy, onCancel, onSave }: {
       <div ref={frame} className={styles.cropFrame} tabIndex={busy ? -1 : 0} role="group" aria-label="사진 위치와 크기 조정" aria-describedby="photo-crop-hint"
         onKeyDown={event => {
           if (busy) return;
-          const delta = { ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }[event.key];
+          const delta = arrowOffsets[event.key];
           const current = currentView.current;
           if (delta) {
             event.preventDefault();
