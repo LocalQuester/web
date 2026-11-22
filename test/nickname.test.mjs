@@ -44,3 +44,14 @@ test('자음과 모음이 각각 입력되어도 조합 단계마다 10글자로
   assert.equal(limitNickname('가나다라마바사아자차'), '가나다라마바사아자차');
   assert.equal(limitNickname('가나다라마바사아자착'), '가나다라마바사아자착');
 });
+test('한글 원문자와 보이지 않는 한글 채움 문자는 거부한다', () => {
+  for (const value of ['\u3260\u3261', '\u3164\u3164', '가\u115F', '가\u1160', '\uFFA0\uFFA0']) {
+    assert.equal(validateNickname(value), 'invalid-characters', JSON.stringify(value));
+  }
+});
+
+test('정상 한글 음절과 자모, 영문, 숫자는 계속 허용한다', () => {
+  for (const value of ['한글12AB', 'ㄱㄴ', 'ㅏㅐ', '가나', 'A\u1100', 'A\u1161', 'A\u11A8']) {
+    assert.equal(validateNickname(value), 'valid', JSON.stringify(value));
+  }
+});

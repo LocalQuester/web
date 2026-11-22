@@ -1,6 +1,9 @@
 export const NICKNAME_MAX_LENGTH = 10;
 export const NICKNAME_MIN_LENGTH = 2;
 
+// 현대 한글 음절과 자모만 허용하며 원문자와 한글 채움 문자는 제외합니다.
+const allowedCharacters = /^[가-힣ㄱ-ㅎㅏ-ㅣ\u1100-\u1112\u1161-\u1175\u11A8-\u11C2A-Za-z0-9]+$/u;
+
 const segmenter = new Intl.Segmenter('ko', { granularity: 'grapheme' });
 
 export function nicknameCharacters(value: string): string[] {
@@ -27,7 +30,7 @@ export function validateNickname(value: string): NicknameValidation {
   const count = nicknameCharacters(normalized).length;
   if (!count) return 'empty';
   if (count > NICKNAME_MAX_LENGTH) return 'too-long';
-  if (!/^[\p{Script=Hangul}A-Za-z0-9]+$/u.test(normalized)) return 'invalid-characters';
+  if (!allowedCharacters.test(normalized)) return 'invalid-characters';
   if (count < NICKNAME_MIN_LENGTH) return 'too-short';
   if (containsUnavailableWord(normalized)) return 'unavailable-word';
   return 'valid';
