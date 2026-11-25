@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { BottomNav } from '../../components/ui/bottom-nav';
 import { getApiUrl } from '../../lib/api-url';
 
 export default async function Home() {
@@ -12,9 +13,14 @@ export default async function Home() {
   }).catch(() => null);
   if (!result?.ok) redirect('/login');
   const { user } = await result.json() as { user: { displayName: string | null } };
-  return <main className="mobile-shell home-screen">
-    <h1>{user.displayName ? `${user.displayName}님, 환영합니다` : 'Local Quester에 오신 것을 환영합니다'}</h1>
-    <p>주변 퀘스트를 준비하고 있습니다.</p>
-    <form action="/api/auth/logout" method="post"><button type="submit">로그아웃</button></form>
-  </main>;
+  return (
+    <div className="mobile-shell" style={{ display: 'flex', flexDirection: 'column' }}>
+      <main className="home-screen">
+        <h1>{user.displayName ? `${user.displayName}님, 환영합니다` : 'Local Quester에 오신 것을 환영합니다'}</h1>
+        <p>주변 퀘스트를 준비하고 있습니다.</p>
+        <form action="/api/auth/logout" method="post"><button type="submit">로그아웃</button></form>
+      </main>
+      <BottomNav />
+    </div>
+  );
 }

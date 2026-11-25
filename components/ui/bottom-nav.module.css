@@ -1,0 +1,116 @@
+
+.nav {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  width: 100%;
+  height: 83px;
+  min-height: 83px;
+  background: #ffffff;
+  border-top: 1px solid #e9eee9;
+  box-sizing: border-box;
+  margin-top: auto;
+  position: relative;
+  z-index: 10;
+}
+
+.item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding-top: 18px;
+  color: #9aa69f;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.item.active {
+  color: #2f7d50;
+  font-weight: 600;
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.label {
+  line-height: 17px;
+}
+
+.arItem {
+  padding-top: 0;
+  gap: 4px;
+}
+
+.arIcon {
+  width: 60px;
+  height: 60px;
+  margin-top: -16px;
+  border-radius: 50%;
+  background: #2f7d50;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 4px solid #ffffff;
+  box-sizing: border-box;
+}
+
+.arIcon {
+  width: 60px;
+  height: 60px;
+  margin-top: -16px;
+  border-radius: 50%;
+
+  /* Figma 그라데이션 */
+  background: linear-gradient(
+    90deg,
+    #438F69 0%,
+    #48976F 40%,
+    #4F9F77 75%,
+    #5CAE84 100%
+  );
+
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 4px solid #ffffff;
+  box-sizing: border-box;
+}
+
+.arIcon img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+
+.arItem .label {
+  margin-top: 0;
+}
+
+.item:focus-visible {
+  outline: 2px solid #2f7d50;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.item {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.item:active {
+  opacity: 0.8;
+}
