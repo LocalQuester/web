@@ -11,13 +11,13 @@ type Tab = 'home' | 'map' | 'ar' | 'collection' | 'profile';
 const tabs: {
   id: Tab;
   label: string;
-  href: string;
+  href?: string;
 }[] = [
   { id: 'home', label: '홈', href: '/home' },
-  { id: 'map', label: '지도', href: '/map/linked' },
-  { id: 'ar', label: 'AR', href: '/ar' },
-  { id: 'collection', label: '수집', href: '/collection' },
-  { id: 'profile', label: '프로필', href: '/profile' },
+  { id: 'map', label: '지도' },
+  { id: 'ar', label: 'AR' },
+  { id: 'collection', label: '수집' },
+  { id: 'profile', label: '프로필' },
 ];
 
 const icons = {
@@ -129,14 +129,16 @@ export function BottomNav({
           </>
         );
 
-        if (isPreview) {
+        if (isPreview || !tab.href) {
           return (
             <button
               key={tab.id}
               type="button"
               className={className}
-              onClick={() => setSelectedTab(tab.id)}
-              aria-pressed={active}
+              disabled={!isPreview}
+              style={isPreview ? undefined : { cursor: 'default' }}
+              onClick={isPreview ? () => setSelectedTab(tab.id) : undefined}
+              aria-pressed={isPreview ? active : undefined}
             >
               {content}
             </button>
