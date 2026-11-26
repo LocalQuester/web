@@ -1,0 +1,339 @@
+/* Figma: Local Quester UI / 로컬 퀘스터 복사본 (606:3810), 402 × 874 기준 */
+:root {
+  color-scheme: light;
+  font-family: Pretendard, system-ui, "Noto Sans KR", sans-serif;
+  color: #27312b;
+  background: #fff;
+  font-synthesis: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body { background: #000; }
+
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+#xr-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+/* 앱을 열자마자 보이는 카메라 미리보기(getUserMedia). AR 세션이 시작되면 WebXR 카메라로 바뀐다 */
+#camera-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+#gesture-surface {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+/* 오류만 잠깐 보여 준다. 사용 방법 안내는 추후 ? 버튼으로 제공 */
+#ar-status {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 57px);
+  left: 50%;
+  max-width: calc(100% - 28px);
+  width: max-content;
+  transform: translateX(-50%);
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(23, 32, 27, .6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
+#ar-status:empty { display: none; }
+
+/* 상단: 비디오/사진 토글(가운데) + 닫기(오른쪽). Figma 기준 상태 바 아래 21px, 높이 24px */
+.camera-top {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 21px);
+  left: 0;
+  right: 0;
+  height: 24px;
+}
+
+/* 비디오/사진 토글 (100 × 24) */
+.mode-toggle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 100px;
+  height: 24px;
+  display: flex;
+  transform: translateX(-50%);
+  border-radius: 25px;
+  background: #d9d9d9;
+}
+.mode-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 49px;
+  height: 22px;
+  border-radius: 25px;
+  background: #fff;
+  transition: transform .18s ease;
+}
+.mode-toggle[data-mode="photo"] .mode-knob { transform: translateX(49px); }
+.mode-toggle button {
+  position: relative;
+  width: 50px;
+  height: 24px;
+  color: #17201b;
+  font-size: 10px;
+  line-height: 24px;
+  text-align: center;
+}
+.mode-toggle button[data-mode="video"] { padding-left: 1px; }
+
+.icon-button img { display: block; }
+
+/* 닫기: 14 × 14 X(꺾쇠 두 개), 중심이 오른쪽 끝에서 38px. 누르기 쉽게 44px 영역 */
+.icon-button.close {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+}
+.close-half {
+  position: absolute;
+  top: 15px;
+  width: 7px;
+  height: 14px;
+}
+.close-half.left { left: 15px; transform: scaleX(-1); }
+.close-half.right { left: 22px; }
+.close-half img {
+  position: absolute;
+  top: -0.8167px;
+  left: -0.8167px;
+}
+
+/* 하단: 갤러리 · 셔터. Figma 기준 셔터(64px) 아래 55px, 갤러리 중심은 셔터 중심에서 왼쪽 120.4px */
+.camera-bottom {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 55px);
+  left: 0;
+  right: 0;
+  height: 64px;
+}
+.icon-button.gallery {
+  position: absolute;
+  top: 12.392px;
+  left: calc(50% - 140px);
+  width: 39.216px;
+  height: 39.216px;
+}
+.icon-button.shutter {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 64px;
+  height: 64px;
+  transform: translateX(-50%);
+}
+.icon-button.shutter::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: #e5484d;
+  transform: translate(-50%, -50%);
+  transition: width .15s, height .15s, border-radius .15s;
+}
+.mode-video .icon-button.shutter::after { width: 16px; height: 16px; }
+.recording .icon-button.shutter::after { width: 18px; height: 18px; border-radius: 4px; }
+
+/* 촬영 결과 시트 */
+.capture-sheet {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(23, 32, 27, .55);
+}
+.capture-sheet[hidden] { display: none; }
+.capture-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(100%, 380px);
+  max-height: 100%;
+  padding: 14px;
+  border-radius: 24px;
+  background: #fff;
+}
+.capture-preview {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #f2f4f2;
+}
+.capture-preview img, .capture-preview video {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+}
+.capture-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr;
+  gap: 8px;
+}
+.capture-actions button {
+  min-height: 46px;
+  border-radius: 14px;
+  background: #2f7d50;
+  color: #fff;
+  font-weight: 700;
+}
+.capture-actions button.secondary {
+  border: 1px solid #d5e4da;
+  background: #fff;
+  color: #2f7d50;
+}
+
+/* 캐릭터 범위 그리기 */
+.cutout-sheet {
+  position: fixed;
+  z-index: 6;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  background: #17201b;
+  color: #fff;
+}
+.cutout-sheet[hidden] { display: none; }
+.cutout-header {
+  position: relative;
+  min-height: 40px;
+  text-align: center;
+}
+.cutout-header p {
+  margin: 0;
+  padding: 0 56px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cutout-cancel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 40px;
+  padding: 0 4px;
+  font-size: 15px;
+}
+.cutout-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#cutout-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.cutout-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.2fr;
+  gap: 8px;
+}
+.cutout-actions button {
+  min-height: 46px;
+  border-radius: 14px;
+  background: #2f7d50;
+  color: #fff;
+  font-weight: 700;
+}
+.cutout-actions button.secondary {
+  border: 1px solid #d5e4da;
+  background: #fff;
+  color: #2f7d50;
+}
+
+/* 배경 제거 중 */
+.processing-overlay {
+  position: fixed;
+  z-index: 7;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(23, 32, 27, .72);
+  color: #fff;
+  font-size: 14px;
+  touch-action: none;
+}
+.processing-overlay[hidden] { display: none; }
+.processing-overlay p { margin: 0; padding: 0 24px; text-align: center; }
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, .3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* AR 세션 중: WebXR 카메라가 뒤에 깔리므로 미리보기와 배경을 숨긴다 */
+body.in-ar,
+body.in-ar #app { background: transparent; }
+body.in-ar #camera-preview { display: none; }
+
+/* 자이로 모드(AR 미지원 기기): 캐릭터 캔버스를 카메라 미리보기 위에 겹치고, 터치는 제스처 영역이 받는다 */
+body.in-gyro #xr-canvas { pointer-events: none; }
