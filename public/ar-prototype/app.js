@@ -129,23 +129,15 @@ function loadImage(src) {
   return image;
 }
 
+// 처음 한 번 AR 지원 여부를 확인해 둡니다. 지원하지 않으면(iPhone 등) 첫 터치에서 자이로 모드로 시작합니다.
 async function checkSupport() {
   if (!window.isSecureContext) {
-    setStatus("보안 연결이 필요해요. HTTPS 주소로 접속해 주세요.");
+    setStatus("보안 연결이 필요해요. HTTPS 주소로 접속해 주세요.", { persist: true });
+    arSupported = false;
     return false;
   }
-  if (!navigator.xr) {
-    setStatus("이 브라우저에서 WebXR을 찾을 수 없어요. Android Chrome에서 열어 주세요.");
-    return false;
-  }
-  try {
-    const supported = await navigator.xr.isSessionSupported("immersive-ar");
-    if (!supported) setStatus("이 기기는 AR을 지원하지 않아요. ARCore 지원 Android 기기와 Chrome인지 확인해 주세요.");
-    return supported;
-  } catch (error) {
-    setStatus(`지원 여부를 확인하지 못했어요: ${error.message}`);
-    return false;
-  }
+  arSupported = await detectARSupport();
+  return arSupported;
 }
 
 function compileShader(type, source) {
@@ -662,6 +654,10 @@ function pickVideoMimeType() {
 }
 
 function startRecording() {
+  if (gyroActive) {
+    startGyroRecording();
+    return;
+  }
   if (!glBinding || !latestCameraSize) {
     setStatus("이 기기에서는 카메라 합성 촬영(camera-access)을 지원하지 않아요.");
     return;
@@ -672,9 +668,13 @@ function startRecording() {
   }
   const { width, height } = getCaptureSize(latestCameraSize, true);
   const crop = getCropRect(width, height);
+  beginRecording(crop.width, crop.height);
+}
+
+function beginRecording(width, height) {
   recordCanvas = document.createElement("canvas");
-  recordCanvas.width = crop.width;
-  recordCanvas.height = crop.height;
+  recordCanvas.width = width;
+  recordCanvas.height = height;
   const mimeType = pickVideoMimeType();
   recordChunks = [];
   recorder = new MediaRecorder(recordCanvas.captureStream(30), mimeType ? { mimeType } : undefined);
@@ -748,8 +748,8 @@ async function shareCapture() {
 
 function onShutter() {
   if (preparingCharacter) return;
-  if (!xrSession) {
-    startAR();
+  if (!isCameraRunning()) {
+    startCamera();
     return;
   }
   if (captureMode === "photo") {
@@ -826,7 +826,12 @@ async function startAR() {
   startingAR = true;
   try {
     const supported = await checkSupport();
-    if (!supported) return;
+    if (!supported) {
+      // 지원 여부를 확인하기 전에 터치한 경우입니다. iPhone은 이때 권한 창이 안 뜰 수 있어, 거부되면 화면 고정으로 동작해요.
+      startingAR = false;
+      startGyroMode();
+      return;
+    }
     stopPreview();
 
     initializeRenderer();
@@ -904,6 +909,243 @@ function onSessionEnded() {
   if (closeRequested && history.length > 1) history.back();
   else startPreview();
   closeRequested = false;
+}
+
+// ---------- 자이로 모드(AR 미지원 기기, iPhone 등) ----------
+
+// 웹 AR(WebXR)을 쓸 수 없는 기기에서는 카메라 미리보기 위에 캐릭터를 그리고, 기울기 센서로 카메라 방향을 따라가서
+// 캐릭터가 공간의 한 자리에 머무는 것처럼 보이게 합니다(위치 이동은 추적하지 않는 3DoF).
+// 바닥은 눈높이 아래의 가상 평면으로 두고, 화면을 터치한 방향과 그 평면이 만나는 곳에 캐릭터를 놓습니다.
+// 안드로이드에서 시험하려면 주소 뒤에 ?mode=gyro 를 붙입니다.
+const FORCE_GYRO_MODE = new URLSearchParams(location.search).get("mode") === "gyro";
+const GYRO_EYE_HEIGHT = 1.3; // m, 가상 바닥까지의 높이
+const GYRO_MAX_DISTANCE = 4; // m, 이보다 멀거나 하늘을 가리키면 이 거리의 바닥에 놓음
+const GYRO_VERTICAL_FOV = 63 * Math.PI / 180; // 세로 화면 기준 후면 카메라 화각(대략값)
+let gyroActive = false;
+let gyroFrameId = 0;
+let gyroOrientation = null; // { alpha, beta, gamma } (도)
+let gyroCameraMatrix = null; // 카메라 → 월드 회전(열 우선 4×4)
+let gyroProjection = null;
+let gyroCanvasHome = null;
+let arSupported = null; // null: 아직 모름
+
+async function detectARSupport() {
+  if (FORCE_GYRO_MODE || !window.isSecureContext || !navigator.xr) return false;
+  try {
+    return await navigator.xr.isSessionSupported("immersive-ar");
+  } catch {
+    return false;
+  }
+}
+
+function onDeviceOrientation(event) {
+  if (event.alpha === null && event.beta === null) return;
+  gyroOrientation = { alpha: event.alpha || 0, beta: event.beta || 0, gamma: event.gamma || 0 };
+}
+
+// iPhone은 기울기 센서를 쓰려면 사용자 터치 안에서 권한을 받아야 합니다. 터치 핸들러에서 await 없이 먼저 부릅니다.
+function requestOrientationPermission() {
+  const request = window.DeviceOrientationEvent?.requestPermission;
+  if (typeof request !== "function") return Promise.resolve("granted");
+  return request.call(DeviceOrientationEvent).catch(() => "denied");
+}
+
+// deviceorientation(지구 좌표: X 동, Y 북, Z 위)을 WebGL 월드 좌표(Y 위, -Z 북)의 카메라 회전으로 바꿉니다.
+function makeGyroCameraMatrix(orientation) {
+  const toRad = Math.PI / 180;
+  const a = orientation.alpha * toRad;
+  const b = orientation.beta * toRad;
+  const g = orientation.gamma * toRad;
+  const screenAngle = (screen.orientation?.angle ?? window.orientation ?? 0) * toRad;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const cb = Math.cos(b), sb = Math.sin(b);
+  const cg = Math.cos(g), sg = Math.sin(g);
+  // R = Rz(alpha) · Rx(beta) · Ry(gamma): 기기 좌표 → 지구 좌표 (행 우선)
+  const r = [
+    ca * cg - sa * sb * sg, -sa * cb, ca * sg + sa * sb * cg,
+    sa * cg + ca * sb * sg, ca * cb, sa * sg - ca * sb * cg,
+    -cb * sg, sb, cb * cg
+  ];
+  // 화면이 돌아간 만큼 되돌립니다: R · Rz(-screenAngle)
+  const cs = Math.cos(-screenAngle), ss = Math.sin(-screenAngle);
+  const m = [
+    r[0] * cs + r[1] * ss, -r[0] * ss + r[1] * cs, r[2],
+    r[3] * cs + r[4] * ss, -r[3] * ss + r[4] * cs, r[5],
+    r[6] * cs + r[7] * ss, -r[6] * ss + r[7] * cs, r[8]
+  ];
+  // 지구 좌표 → 월드 좌표: x = 동, y = 위(지구 Z), z = 남(-지구 Y)
+  const row = (i) => [m[i * 3], m[i * 3 + 1], m[i * 3 + 2]];
+  const [ex, ey, ez] = [row(0), row(1), row(2)];
+  const wx = ex, wy = ez, wz = ey.map((value) => -value);
+  return new Float32Array([
+    wx[0], wy[0], wz[0], 0,
+    wx[1], wy[1], wz[1], 0,
+    wx[2], wy[2], wz[2], 0,
+    0, 0, 0, 1
+  ]);
+}
+
+function makePerspective(fovY, aspect, near, far) {
+  const f = 1 / Math.tan(fovY / 2);
+  return new Float32Array([
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) / (near - far), -1,
+    0, 0, (2 * far * near) / (near - far), 0
+  ]);
+}
+
+// 화면 좌표(px)에서 나간 시선이 가상 바닥과 만나는 지점을 캐릭터 위치(평행이동 행렬)로 돌려줍니다.
+function gyroFloorHit(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+  const tanY = Math.tan(GYRO_VERTICAL_FOV / 2);
+  const local = [ndcX * tanY * (rect.width / rect.height), ndcY * tanY, -1];
+  const m = gyroCameraMatrix;
+  const dir = [
+    m[0] * local[0] + m[4] * local[1] + m[8] * local[2],
+    m[1] * local[0] + m[5] * local[1] + m[9] * local[2],
+    m[2] * local[0] + m[6] * local[1] + m[10] * local[2]
+  ];
+  let x, z;
+  const horizontal = Math.hypot(dir[0], dir[2]) || 1;
+  if (dir[1] < -0.05 && GYRO_EYE_HEIGHT / -dir[1] * horizontal <= GYRO_MAX_DISTANCE) {
+    const t = GYRO_EYE_HEIGHT / -dir[1];
+    x = dir[0] * t;
+    z = dir[2] * t;
+  } else {
+    x = dir[0] / horizontal * GYRO_MAX_DISTANCE * 0.5;
+    z = dir[2] / horizontal * GYRO_MAX_DISTANCE * 0.5;
+  }
+  const matrix = identityMatrix();
+  matrix[12] = x;
+  matrix[13] = -GYRO_EYE_HEIGHT;
+  matrix[14] = z;
+  return matrix;
+}
+
+function resizeGyroCanvas() {
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  gyroProjection = makePerspective(GYRO_VERTICAL_FOV, width / height, 0.05, 50);
+}
+
+function renderGyroFrame(time) {
+  if (!gyroActive) return;
+  resizeGyroCanvas();
+  // 센서 값이 아직 없으면(권한 거부·센서 없음) 정면 아래를 보는 자세로 고정합니다.
+  gyroCameraMatrix = makeGyroCameraMatrix(gyroOrientation || { alpha: 0, beta: 70, gamma: 0 });
+  if (!placedCharacter && cameraPreview.videoWidth) {
+    const rect = canvas.getBoundingClientRect();
+    placeCharacter(gyroFloorHit(rect.left + rect.width / 2, rect.top + rect.height * 0.6));
+  }
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // 카메라는 원점에 있고 회전만 하므로 view = 회전의 역행렬(전치)입니다.
+  const m = gyroCameraMatrix;
+  const view = new Float32Array([
+    m[0], m[4], m[8], 0,
+    m[1], m[5], m[9], 0,
+    m[2], m[6], m[10], 0,
+    0, 0, 0, 1
+  ]);
+  drawScene(multiplyMatrices(gyroProjection, view), time, false);
+  // WebGL 캔버스는 이 프레임이 끝나면 지워지므로, 촬영은 그리기 직후 같은 프레임에서 합성합니다.
+  if (pendingPhoto || recorder) captureGyroFrame();
+  gyroFrameId = requestAnimationFrame(renderGyroFrame);
+}
+
+// 카메라 영상(화면처럼 꽉 차게 자른 것) 위에 캐릭터 캔버스를 겹쳐 그립니다.
+function composeGyroFrame(target) {
+  const context = target.getContext("2d");
+  const videoWidth = cameraPreview.videoWidth;
+  const videoHeight = cameraPreview.videoHeight;
+  const scale = Math.max(target.width / videoWidth, target.height / videoHeight);
+  const drawWidth = videoWidth * scale;
+  const drawHeight = videoHeight * scale;
+  context.drawImage(cameraPreview, (target.width - drawWidth) / 2, (target.height - drawHeight) / 2, drawWidth, drawHeight);
+  context.drawImage(canvas, 0, 0, target.width, target.height);
+}
+
+function captureGyroFrame() {
+  if (!cameraPreview.videoWidth) return;
+  if (pendingPhoto) {
+    pendingPhoto = false;
+    const output = document.createElement("canvas");
+    output.width = canvas.width & ~1;
+    output.height = canvas.height & ~1;
+    composeGyroFrame(output);
+    output.toBlob((blob) => {
+      if (blob) showCapture(blob, "image/jpeg");
+      else setStatus("사진을 만들지 못했어요.");
+    }, "image/jpeg", 0.92);
+  } else if (recordCanvas) {
+    composeGyroFrame(recordCanvas);
+  }
+}
+
+function startGyroRecording() {
+  if (typeof MediaRecorder === "undefined" || !HTMLCanvasElement.prototype.captureStream) {
+    setStatus("이 브라우저는 영상 녹화를 지원하지 않아요.");
+    return;
+  }
+  const scale = Math.min(1, VIDEO_MAX_WIDTH / canvas.width);
+  beginRecording(Math.round(canvas.width * scale) & ~1, Math.round(canvas.height * scale) & ~1);
+}
+
+// 터치(권한 요청)와 같은 호출 안에서 시작해야 해서 async 없이 시작합니다.
+function startGyroMode() {
+  if (gyroActive) return;
+  const permission = requestOrientationPermission();
+  gyroActive = true;
+  latestCameraPosition = { x: 0, y: 0, z: 0 };
+  initializeRenderer();
+  // 캐릭터 캔버스를 카메라 미리보기 바로 위(버튼·제스처 영역 아래)로 옮깁니다.
+  gyroCanvasHome = { parent: canvas.parentNode, next: canvas.nextSibling };
+  cameraPreview.after(canvas);
+  document.body.classList.add("in-gyro");
+  window.addEventListener("deviceorientation", onDeviceOrientation);
+  permission.then((state) => {
+    if (state !== "granted") setStatus("동작 및 방향 권한이 없어 캐릭터가 화면에 고정돼요.");
+  });
+  startPreview();
+  gyroFrameId = requestAnimationFrame(renderGyroFrame);
+}
+
+function stopGyroMode() {
+  if (!gyroActive) return;
+  gyroActive = false;
+  cancelAnimationFrame(gyroFrameId);
+  stopRecording();
+  window.removeEventListener("deviceorientation", onDeviceOrientation);
+  if (gyroCanvasHome) gyroCanvasHome.parent.insertBefore(canvas, gyroCanvasHome.next);
+  document.body.classList.remove("in-gyro");
+  placedCharacter = null;
+  pendingPhoto = false;
+  characterScale = 1;
+  manualRotation = 0;
+}
+
+// 화면 첫 터치·셔터에서 부릅니다. AR을 지원하면 WebXR, 아니면 자이로 모드로 시작합니다.
+function startCamera() {
+  if (arSupported === false) startGyroMode();
+  else startAR();
+}
+
+function isCameraRunning() {
+  return Boolean(xrSession) || gyroActive;
 }
 
 // ---------- 캐릭터 누끼(배경 제거) ----------
@@ -1425,17 +1667,18 @@ closeButton.addEventListener("click", () => {
   if (xrSession) {
     closeRequested = true;
     xrSession.end();
-  } else if (history.length > 1) {
-    history.back();
+    return;
   }
+  stopGyroMode();
+  if (history.length > 1) history.back();
 });
-// 미리보기 화면 아무 곳이나 처음 터치하면 AR을 시작합니다(버튼·토글·촬영 결과 시트는 제외).
+// 미리보기 화면 아무 곳이나 처음 터치하면 AR(지원하지 않으면 자이로 모드)을 시작합니다(버튼·토글·촬영 결과 시트는 제외).
 app.addEventListener("click", (event) => {
   // 캐릭터를 준비하는 동안(범위 그리기·배경 제거)에는 AR을 시작하지 않습니다. 동시에 시작하면 화면이 멈췄습니다.
-  if (xrSession || startingAR || preparingCharacter) return;
+  if (isCameraRunning() || startingAR || preparingCharacter) return;
   if (event.target.closest("button, input, .capture-sheet, .cutout-sheet, .processing-overlay")) return;
   resumeARAfterGallery = false;
-  startAR();
+  startCamera();
 });
 modeToggle.addEventListener("click", (event) => {
   const mode = event.target.closest("button")?.dataset.mode;
@@ -1495,9 +1738,17 @@ captureCloseButton.addEventListener("click", closeCapture);
 captureSaveButton.addEventListener("click", saveCapture);
 captureShareButton.addEventListener("click", shareCapture);
 
+// 자이로 모드에서는 WebXR select 이벤트가 없어서, 한 손가락 터치·드래그로 캐릭터를 그 위치의 바닥으로 옮깁니다.
+function moveGyroCharacter(event) {
+  if (!gyroActive || pinchGesture || activePointers.size !== 1 || !gyroCameraMatrix) return;
+  if (performance.now() < suppressSelectUntil) return;
+  placeCharacter(gyroFloorHit(event.clientX, event.clientY));
+}
+
 gestureSurface.addEventListener("pointerdown", (event) => {
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   try { gestureSurface.setPointerCapture(event.pointerId); } catch { /* XR overlay may not support capture */ }
+  moveGyroCharacter(event);
   if (activePointers.size >= 2 && placedCharacter) {
     const points = [...activePointers.values()];
     const dx = points[1].x - points[0].x;
@@ -1515,6 +1766,7 @@ gestureSurface.addEventListener("pointerdown", (event) => {
 gestureSurface.addEventListener("pointermove", (event) => {
   if (!activePointers.has(event.pointerId)) return;
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  moveGyroCharacter(event);
   if (!pinchGesture || activePointers.size < 2 || !placedCharacter) return;
 
   const points = [...activePointers.values()];

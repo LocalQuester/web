@@ -334,3 +334,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 body.in-ar,
 body.in-ar #app { background: transparent; }
 body.in-ar #camera-preview { display: none; }
+
+/* 자이로 모드(AR 미지원 기기): 캐릭터 캔버스를 카메라 미리보기 위에 겹치고, 터치는 제스처 영역이 받는다 */
+body.in-gyro #xr-canvas { pointer-events: none; }
