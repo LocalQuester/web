@@ -1,0 +1,11 @@
+{
+  "name": "로컬 퀘스터 AR",
+  "short_name": "퀘스터 AR",
+  "description": "LocalQuester PWA WebXR AR 촬영",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
